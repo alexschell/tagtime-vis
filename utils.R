@@ -8,7 +8,7 @@ parseLogfile <- function(logfile.path, regexes, perl) {
   tags <- sapply(log, 
                  function(x) {
                    nonempty <- x[x != ""]
-                   paste(nonempty[-(length(nonempty) - 2:0)][-1], "", 
+                   paste(c("", nonempty[-(length(nonempty) - 2:0)][-1], ""), 
                          collapse = " ")
                  })
   matches <- sapply(regexes, function(x) grepl(x, tags, perl = perl))

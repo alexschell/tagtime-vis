@@ -1,10 +1,11 @@
-# server.R
 source("utils.R")
 source("plotting.R")
 
 shinyServer(
   function(input, output) {
-
+    
+    # Reactive object containing log file data (NULL pre-upload)
+    #
     # needs error messages
     data <- reactive({
       input$refresh
@@ -21,67 +22,29 @@ shinyServer(
         )
       }
     })
-
+    
+    # Reactive object containing user-input tag names / regexes and 
+    # corresponding descriptive names
+    #
     # needs error messages
     categories <- reactive({
       input$refresh
       tryCatch({
-        regexes <- eval(parse(text = paste("c(", isolate(input$regexes), ")", 
-                                           sep = "")))
-        catnames <- eval(parse(text = paste("c(", isolate(input$catnames), ")", 
-                                            sep = "")))
+        regexes <- 
+          eval(parse(text = paste("c(", isolate(input$regexes), ")", 
+                                  sep = "")))
+        catnames <- 
+          eval(parse(text = paste("c(", isolate(input$catnames), ")", 
+                                  sep = "")))
         list(regexes = regexes, catnames = catnames)
         }, 
         error = function(cond) NULL, 
         warning = function(cond) NULL
       )
     })
-
-    output$userinput <- renderUI({
-      helpText("contents of categories()$* go here")
-    })  # placeholder..
-
-    output$catUI <- renderUI({
-      input$refresh
-      selectInput("cat", 
-                  label = "Pick a category to look at:", 
-                  choices = categories()$catnames, 
-                  selected = categories()$catnames[1])
-    })
-
-    output$cat2UI <- renderUI({
-      input$refresh
-      selectInput("cat2", 
-                  label = "", 
-                  choices = categories()$catnames, 
-                  selected = categories()$catnames[2])
-    })
-
-    output$catxUI <- renderUI({
-      input$refresh
-      selectInput("catx", 
-                  label = "Independent variable:", 
-                  choices = categories()$catnames, 
-                  selected = categories()$catnames[2])
-    })
-
-    output$catcUI <- renderUI({
-      input$refresh
-      selectInput("catc", 
-                  label = "", 
-                  choices = categories()$catnames, 
-                  selected = categories()$catnames[3])
-    })
-
-    output$legend <- renderUI({
-      input$refresh
-      helpText(
-        strong("Color coding:"), 
-        div(input$cat, style = "color:#0080FF"), 
-        div(input$cat2, style = "color:#F08080")) # lightcoral
-    })
     
-    # what's the value of input$daterange if daterangeUI == NULL ? NULL!
+    
+    # Reactive date range UI (default: log file span)
     output$daterangeUI <- renderUI({
       input$refresh
       if (is.null(data())) {
@@ -90,12 +53,62 @@ shinyServer(
         timestamps <- data()$timestamps
         dateRangeInput("daterange", 
           label = "Time frame to display:", 
-          start = as.Date(as.POSIXct(min(timestamps), origin = "1970-01-01")), 
-          end = as.Date(as.POSIXct(max(timestamps), origin = "1970-01-01")))
+          start = as.Date(as.POSIXct(min(timestamps), 
+                                     origin = "1970-01-01")), 
+          end = as.Date(as.POSIXct(max(timestamps), 
+                                   origin = "1970-01-01")))
+          # input$daterange is NULL if daterangeUI is NULL
       }
     })
+    
+    # Main category
+    output$catUI <- renderUI({
+      input$refresh
+      selectInput("cat", 
+                  label = "Pick a category to look at:", 
+                  choices = categories()$catnames, 
+                  selected = categories()$catnames[1])
+    })
+    
+    # Secondary category (matrix, weekday displays)
+    output$cat2UI <- renderUI({
+      input$refresh
+      selectInput("cat2", 
+                  label = "", 
+                  choices = categories()$catnames, 
+                  selected = categories()$catnames[2])
+    })
+    
+    # Category for x-axis of scatterplot
+    output$catxUI <- renderUI({
+      input$refresh
+      selectInput("catx", 
+                  label = "Independent variable:", 
+                  choices = categories()$catnames, 
+                  selected = categories()$catnames[2])
+    })
 
-    # redundant daterange null check?
+    # Conditioning variable (trellis scatterplot)
+    output$catcUI <- renderUI({
+      input$refresh
+      selectInput("catc", 
+                  label = "", 
+                  choices = categories()$catnames, 
+                  selected = categories()$catnames[3])
+    })
+
+    # Color coded legend (matrix, weekday if input$addcat is TRUE)
+    output$legend <- renderUI({
+      input$refresh
+      helpText(
+        strong("Color coding:"), 
+        div(input$cat, style = "color:#0080FF"), 
+        div(input$cat2, style = "color:#F08080")) # lightcoral
+    })
+    
+    
+    # Boolean vector indicating for every ping whether it is in the
+    # range of input$daterange
     timeframe <- reactive({
       if (is.null(data())) {
         NULL
@@ -114,6 +127,7 @@ shinyServer(
       }
     })
     
+    # Computes date axis from timeframe()
     date.axis <- reactive({
       if (is.null(data())) {
         NULL
@@ -127,6 +141,9 @@ shinyServer(
       }
     })
     
+    # Computes 0 - 24 time of day axis from input$midnight
+    #
+    # only works properly for input$midnight in 0:6
     timeofday.axis <- reactive({
       mn <- as.numeric(input$midnight)
       if (mn == 0) {
@@ -143,6 +160,9 @@ shinyServer(
       data.frame(at = at, lab = lab)
     })
     
+    # For every timestamp, computes timestamp of most recent past 
+    # custom midnight, hours since past custom midnight, and weekday
+    # (custom midnight adjusted)
     coords <- reactive({
       if (is.null(data())) {
         NULL
@@ -153,6 +173,7 @@ shinyServer(
       }
     })
     
+    
     output$hist <- renderPlot({
       if (is.null(data()) | 
           any(c(input$cat) == "") | 
@@ -161,7 +182,7 @@ shinyServer(
       } else {
         timestamps <- data()$timestamps
         matches <- data()$matches
-        n.cat <- which(input$cat == categories()$catnames)
+        n.cat <- which(input$cat == categories()$catnames)[1]
         times.all <- timestamps[matches[,n.cat]]
         times.sub <- timestamps[timeframe()][matches[timeframe(), n.cat]]
         par(mar = c(5.1, 4.1, 4.1, 2.6))
@@ -187,7 +208,7 @@ shinyServer(
         NULL
       } else {
         matches <- data()$matches
-        n.cat <- which(input$cat == categories()$catnames)
+        n.cat <- which(input$cat == categories()$catnames)[1]
         coords <- coords()[timeframe() & matches[,n.cat],]
         par(mar = c(5.1, 4.1, 4.1, 2.6))
         par(las = 1)
@@ -196,7 +217,7 @@ shinyServer(
                    xaxs = date.axis(), 
                    yaxs = timeofday.axis())
         if (input$addcat) {
-          n.cat2 <- which(input$cat2 == categories()$catnames)
+          n.cat2 <- which(input$cat2 == categories()$catnames)[1]
           coords2 <- coords()[timeframe() & matches[,n.cat2],]
           matrixPlot(dates = coords2$prev.midnight, 
                      timesofday = coords2$timeofday, 
@@ -216,7 +237,7 @@ shinyServer(
         NULL
       } else {
         matches <- data()$matches
-        n.cat <- which(input$cat == categories()$catnames)
+        n.cat <- which(input$cat == categories()$catnames)[1]
         wdays <- switch(input$weekend,
                   "Weekdays only" = 1:5, 
                   "Weekends only" = 6:7, 
@@ -238,7 +259,7 @@ shinyServer(
         NULL
       } else {
         matches <- data()$matches
-        n.cat <- which(input$cat == categories()$catnames)
+        n.cat <- which(input$cat == categories()$catnames)[1]
         coords <- coords()[timeframe() & matches[,n.cat],]
         par(mar = c(5.1, 4.1, 4.1, 2.6))
         par(las = 1)
@@ -248,7 +269,7 @@ shinyServer(
                  chron = input$ordered.week,
                  yaxs = timeofday.axis())
         if (input$addcat) {
-          n.cat2 <- which(input$cat2 == categories()$catnames)
+          n.cat2 <- which(input$cat2 == categories()$catnames)[1]
           coords2 <- coords()[timeframe() & matches[,n.cat2],]
           weekPlot(dates = coords2$prev.midnight, 
                    timesofday = coords2$timeofday, 
@@ -262,7 +283,7 @@ shinyServer(
         }
       }
     })
-
+    
     # Note antialiasing doesn't work in the deployed version
     output$scatter <- renderPlot({
       if (is.null(data()) | is.null(coords()) | 
@@ -273,8 +294,8 @@ shinyServer(
         NULL
       } else {
         matches <- data()$matches
-        n.cat <- which(input$cat == categories()$catnames)
-        n.catx <- which(input$catx == categories()$catnames)
+        n.cat <- which(input$cat == categories()$catnames)[1]
+        n.catx <- which(input$catx == categories()$catnames)[1]
         
         # this is still very repetitive
         dates <- coords()$prev.midnight[timeframe()]
@@ -291,7 +312,7 @@ shinyServer(
                       jitter = input$jitter, 
                       trellis = input$trellis)
         } else {
-          n.catc <- which(input$catc == categories()$catnames)
+          n.catc <- which(input$catc == categories()$catnames)[1]
           z <- countPings(dates = dates, 
                           subset = matches[timeframe(), n.catc])
           z <- z * input$ping.interval / 60
