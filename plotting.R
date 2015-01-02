@@ -1,8 +1,9 @@
 # All plotting functions
 
 require("lattice")
+require("Cairo")
 
-histPlot <- function(catname, times.all, times.sub, ping.interval = 45, 
+histPlot <- function(catname, times.all, times.sub, 
                      n.bins, units, xaxs, bandwidth, padding = 0.1) {
   n.breaks <- as.numeric(n.bins) + 1
   breaks <- seq(xaxs$at[1], xaxs$at[nrow(xaxs)], length = n.breaks)
@@ -13,7 +14,6 @@ histPlot <- function(catname, times.all, times.sub, ping.interval = 45,
     # convert from pings per bin to hours per week
   
   # add some padding to times.all to avoid density going to zero at extremes:
-  # print(head(times.all))
   times.all.padded <- padding(times.all, fraction = padding)
   d <- density(times.all.padded, adjust = bandwidth)
   d$y <- d$y * length(times.all.padded) * ping.interval / 60 * 
@@ -41,7 +41,7 @@ matrixPlot <- function(dates, timesofday,
   if (!add) {
     list(
       plot(dates, timesofday, 
-           pch = "+", cex = 0.75, col = addAlpha("#0080ff", 0.5), main = "", 
+           pch = 16, cex = 0.75, col = addAlpha("#0080ff", 0.35), main = "", 
            xlab = "", ylab = "Time of day", xaxt = "n", yaxt = "n", 
            xlim = range(xaxs$at), xaxs = "i", 
            ylim = c(0,24), yaxs = "i", bty = "n"), 
@@ -53,9 +53,35 @@ matrixPlot <- function(dates, timesofday,
   } else {
     list(
       points(dates, timesofday, 
-             pch = "+", cex = 0.75, col = addAlpha("lightcoral", 0.5))
+             pch = 16, cex = 0.75, col = addAlpha("lightcoral", 0.35))
     )
   }
+}
+
+scatterPlot <- function(x, y, z = NULL, names, jitter, trellis, 
+                        plotTitle, panels = 4) {
+  if (jitter) {
+    y <- jitter(y, factor = 2)
+    x <- jitter(x, factor = 2)
+  }
+  if(!trellis) {
+    formula <- y ~ x
+    plotTitle <- paste(names[1], "vs.", tolower(names[2]), 
+                       "(aggregated by day)")
+    strip <- FALSE
+  } else {
+    formula <- y ~ x | equal.count(z, panels, overlap = 0.05)
+    plotTitle <- paste(names[1], " vs. ", tolower(names[2]), 
+                       " (conditioned on ", tolower(names[3]), 
+                       ")", sep = "")
+    stripLabels <- rep(paste(names[3], "(approximate quantiles)"), panels)
+    strip <- strip.custom(factor.levels = stripLabels, 
+                            strip.levels = TRUE, strip.names = FALSE)
+  }
+  xyplot(formula, pch = 16, cex = 1, alpha = 0.35, main = plotTitle, 
+         xlab = paste(names[2], "(estimated hours)"), 
+         ylab = paste(names[1], "(estimated hours)"), 
+         strip = strip)
 }
 
 timeofdayPlot <- function(catname, timesofday, xaxs, bandwidth) {
@@ -92,8 +118,8 @@ weekPlot <- function(dates, timesofday, wdays, chron,
   
   if (!add) {
     list(
-      plot(wdays, timesofday, pch = "+", cex = 0.75, 
-           col = addAlpha("#0080ff", 0.5),
+      plot(wdays, timesofday, pch = 16, cex = 0.75, 
+           col = addAlpha("#0080ff", 0.35),
            yaxt = "n", xaxt = "n", main = "", 
            ylab = "Time of day", ylim = c(0, 24), 
            xlab = "", xlim = c(1, 7)), 
@@ -104,34 +130,8 @@ weekPlot <- function(dates, timesofday, wdays, chron,
     )
   } else {
     list(
-      points(wdays, timesofday, pch = "+", cex = 0.75, 
-             col = addAlpha("lightcoral", 0.5))
+      points(wdays, timesofday, pch = 16, cex = 0.75, 
+             col = addAlpha("lightcoral", 0.35))
     )
   }
-}
-
-scatterPlot <- function(x, y, z = NULL, names, jitter, trellis, 
-                        plotTitle, panels = 4) {
-  if (jitter) {
-    y <- jitter(y, factor = 2)
-    x <- jitter(x, factor = 2)
-  }
-  if(!trellis) {
-    formula <- y ~ x
-    plotTitle <- paste(names[1], "vs.", tolower(names[2]), 
-                       "(aggregated by day)")
-    strip <- FALSE
-  } else {
-    formula <- y ~ x | equal.count(z, panels, overlap = 0.05)
-    plotTitle <- paste(names[1], " vs. ", tolower(names[2]), 
-                       " (conditioned on ", tolower(names[3]), 
-                       ")", sep = "")
-    stripLabels <- rep(paste(names[3], "(approximate quantiles)"), panels)
-    strip <- strip.custom(factor.levels = stripLabels, 
-                            strip.levels = TRUE, strip.names = FALSE)
-  }
-  xyplot(formula, pch = "+", cex = 2, alpha = 0.5, main = plotTitle, 
-         xlab = paste(names[2], "(estimated hours)"), 
-         ylab = paste(names[1], "(estimated hours)"), 
-         strip = strip)
 }
