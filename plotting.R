@@ -3,7 +3,7 @@
 require("lattice")
 require("Cairo")
 
-histPlot <- function(catname, times.all, times.sub, 
+histPlot <- function(catname, times.all, times.sub, ping.interval, 
                      n.bins, units, xaxs, bandwidth, padding = 0.1) {
   n.breaks <- as.numeric(n.bins) + 1
   breaks <- seq(xaxs$at[1], xaxs$at[nrow(xaxs)], length = n.breaks)
